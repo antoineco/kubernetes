@@ -60,7 +60,17 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 				CreateOption: "attach",
 			})
 	}
-	vm.StorageProfile.DataDisks = &disks
+	newVM := computepreview.VirtualMachineScaleSetVM{
+		Sku:      vm.Sku,
+		Location: vm.Location,
+		VirtualMachineScaleSetVMProperties: &computepreview.VirtualMachineScaleSetVMProperties{
+			HardwareProfile: vm.HardwareProfile,
+			StorageProfile: &computepreview.StorageProfile{
+				OsDisk:    vm.StorageProfile.OsDisk,
+				DataDisks: &disks,
+			},
+		},
+	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
@@ -69,7 +79,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	defer ss.vmssVMCache.Delete(ss.makeVmssVMName(ssName, instanceID))
 
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", ss.resourceGroup, nodeName, diskName)
-	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, ss.resourceGroup, ssName, instanceID, vm)
+	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, ss.resourceGroup, ssName, instanceID, newVM)
 	if err != nil {
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
@@ -109,7 +119,18 @@ func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 		return fmt.Errorf("detach azure disk failure, disk %s not found, diskURI: %s", diskName, diskURI)
 	}
 
-	vm.StorageProfile.DataDisks = &disks
+	newVM := computepreview.VirtualMachineScaleSetVM{
+		Sku:      vm.Sku,
+		Location: vm.Location,
+		VirtualMachineScaleSetVMProperties: &computepreview.VirtualMachineScaleSetVMProperties{
+			HardwareProfile: vm.HardwareProfile,
+			StorageProfile: &computepreview.StorageProfile{
+				OsDisk:    vm.StorageProfile.OsDisk,
+				DataDisks: &disks,
+			},
+		},
+	}
+
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
@@ -117,7 +138,7 @@ func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 	defer ss.vmssVMCache.Delete(ss.makeVmssVMName(ssName, instanceID))
 
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s)", ss.resourceGroup, nodeName, diskName)
-	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, ss.resourceGroup, ssName, instanceID, vm)
+	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, ss.resourceGroup, ssName, instanceID, newVM)
 	if err != nil {
 		glog.Errorf("azureDisk - detach disk(%s) from %s failed, err: %v", diskName, nodeName, err)
 	} else {
