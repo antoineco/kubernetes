@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -83,11 +84,12 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	return ss.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
 }
 
-// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
-func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+// DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
+func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
 	// 1. vmType is standard, detach with availabilitySet.DetachDiskByName.
 	if c.cloud.VMType == vmTypeStandard {
-		return c.cloud.vmSet.DetachDiskByName(diskName, diskURI, nodeName)
+		_, err := c.cloud.vmSet.DetachDisk(diskName, diskURI, nodeName)
+		return err
 	}
 
 	// 2. vmType is Virtual Machine Scale Set (vmss), convert vmSet to scaleSet.
@@ -103,11 +105,30 @@ func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName t
 	}
 	if managedByAS {
 		// vm is managed by availability set.
-		return ss.availabilitySet.DetachDiskByName(diskName, diskURI, nodeName)
+		_, err := ss.availabilitySet.DetachDisk(diskName, diskURI, nodeName)
+		return err
 	}
 
 	// 4. Node is managed by vmss, detach with scaleSet.DetachDiskByName.
-	return ss.DetachDiskByName(diskName, diskURI, nodeName)
+	resp, err := ss.DetachDisk(diskName, diskURI, nodeName)
+	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		glog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+			resp, err := ss.DetachDisk(diskName, diskURI, nodeName)
+			return processHTTPRetryResponse(resp, err)
+		})
+		if retryErr != nil {
+			err = retryErr
+			glog.V(2).Infof("azureDisk - update abort backoff: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		}
+	}
+	if err != nil {
+		glog.Errorf("azureDisk - detach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
+	} else {
+		glog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
+	}
+
+	return err
 }
 
 // GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
