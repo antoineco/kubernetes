@@ -413,8 +413,9 @@ func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 	return false
 }
 
+// processHTTPRetryResponse : return true means stop retry, false means continue retry
 func processHTTPRetryResponse(resp *http.Response, err error) (bool, error) {
-	if resp != nil {
+	if err == nil && resp != nil {
 		// HTTP 2xx suggests a successful response
 		if 199 < resp.StatusCode && resp.StatusCode < 300 {
 			return true, nil

@@ -126,6 +126,11 @@ func TestProcessRetryResponse(t *testing.T) {
 			stop: true,
 		},
 		{
+			code: http.StatusOK,
+			err:  fmt.Errorf("some error"),
+			stop: false,
+		},
+		{
 			code: 399,
 			stop: true,
 		},
