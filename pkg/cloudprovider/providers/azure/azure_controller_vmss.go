@@ -127,7 +127,8 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	}
 
 	if !bFoundDisk {
-		return nil, fmt.Errorf("detach azure disk failure, disk %s not found, diskURI: %s", diskName, diskURI)
+		// only log here, next action is to update VM status with original meta data
+		glog.Errorf("detach azure disk: disk %s not found, diskURI: %s", diskName, diskURI)
 	}
 
 	newVM := computepreview.VirtualMachineScaleSetVM{
