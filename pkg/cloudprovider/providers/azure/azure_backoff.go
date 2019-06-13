@@ -364,9 +364,11 @@ func (az *Cloud) UpdateVmssVMWithRetry(ctx context.Context, resourceGroupName st
 
 // A wait.ConditionFunc function to deal with common HTTP backoff response conditions
 func processRetryResponse(resp autorest.Response, err error) (bool, error) {
-	if isSuccessHTTPResponse(resp) {
-		glog.V(2).Infof("processRetryResponse: backoff success, HTTP response=%d", resp.StatusCode)
-		return true, nil
+	if err == nil && resp.Response != nil {
+		if isSuccessHTTPResponse(resp) {
+			glog.V(2).Infof("processRetryResponse: backoff success, HTTP response=%d", resp.StatusCode)
+			return true, nil
+		}
 	}
 	if shouldRetryAPIRequest(resp, err) {
 		glog.Errorf("processRetryResponse: backoff failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)

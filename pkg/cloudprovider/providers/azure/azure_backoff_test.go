@@ -137,12 +137,10 @@ func TestProcessRetryResponse(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resp := autorest.Response{
-			Response: &http.Response{
-				StatusCode: test.code,
-			},
+		resp := &http.Response{
+			StatusCode: test.code,
 		}
-		res, err := processRetryResponse(resp, test.err)
+		res, err := processHTTPRetryResponse(resp, test.err)
 		if res != test.stop {
 			t.Errorf("expected: %v, saw: %v", test.stop, res)
 		}
